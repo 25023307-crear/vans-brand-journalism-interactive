@@ -23,6 +23,12 @@ const USER_STORE_FRONT = `${import.meta.env.BASE_URL}images/store-front.jpg`;
 const USER_STORE_DISPLAY = `${import.meta.env.BASE_URL}images/store-display.jpg`;
 const USER_STORE_VISIT = `${import.meta.env.BASE_URL}images/store-visit.jpg`;
 
+const galleryItems = [
+  { src: USER_STORE_FRONT, number: "01", title: "Fachada de la tienda", description: "Vista exterior de una tienda Vans durante la visita de observación.", alt: "Fachada exterior de una tienda Vans, fotografiada por José Antonio Lorenzo Mora durante su visita de campo" },
+  { src: USER_STORE_DISPLAY, number: "02", title: "Exhibición de producto", description: "Organización visual del calzado y la comunicación de producto dentro del punto de venta.", alt: "Exhibición de tenis Vans en el interior de una tienda, con modelos y materiales organizados en anaqueles" },
+  { src: USER_STORE_VISIT, number: "03", title: "Recorrido de observación", description: "Registro de la interacción del estudiante con el espacio y la exhibición de calzado.", alt: "José Antonio Lorenzo Mora observa una exhibición de calzado Vans dentro de la tienda" },
+];
+
 const sourceLinks = [
   {
     number: "01",
@@ -57,16 +63,36 @@ const scrollToSection = (id: string) => {
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
+  const [sending, setSending] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const goTo = (id: string) => {
     scrollToSection(id);
     setMenuOpen(false);
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
-    event.currentTarget.reset();
+    setSubmitted(false);
+    setFormError("");
+    const form = event.currentTarget;
+    const endpoint = import.meta.env.VITE_FORMSPREE_ENDPOINT;
+    if (!endpoint) {
+      setFormError("El formulario necesita configurar VITE_FORMSPREE_ENDPOINT. Consulta el archivo .env.example.");
+      return;
+    }
+    setSending(true);
+    try {
+      const response = await fetch(endpoint, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(new FormData(form))) });
+      if (!response.ok) throw new Error("No se pudo enviar");
+      setSubmitted(true);
+      form.reset();
+    } catch {
+      setFormError("No pudimos enviar tu participación. Revisa tu conexión e inténtalo de nuevo.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -182,11 +208,16 @@ export default function Home() {
         <section className="field-notes-section section-pad" id="registro-visual">
           <div className="section-kicker"><span>04</span><span>Registro visual / visita del estudiante</span></div>
           <div className="field-notes-heading"><h2>La marca también se observa <em>en el espacio real.</em></h2><p>Estas fotografías fueron proporcionadas por José Antonio Lorenzo Mora para documentar la experiencia de acercamiento a una tienda Vans: su fachada, su exhibición y la interacción con el espacio de venta.</p></div>
-          <div className="user-gallery">
-            <figure className="user-photo user-photo-large"><img src={USER_STORE_FRONT} alt="Fachada de una tienda Vans fotografiada por José Antonio Lorenzo Mora" /><figcaption><span>01</span> Fachada de tienda Vans · Archivo del estudiante</figcaption></figure>
-            <figure className="user-photo"><img src={USER_STORE_DISPLAY} alt="Exhibición de calzado Vans dentro de una tienda" /><figcaption><span>02</span> Exhibición de producto · Archivo del estudiante</figcaption></figure>
-            <figure className="user-photo"><img src={USER_STORE_VISIT} alt="Recorrido del estudiante frente a una exhibición de calzado Vans" /><figcaption><span>03</span> Recorrido de observación · Archivo del estudiante</figcaption></figure>
+          <div className="user-gallery" aria-label="Álbum fotográfico de la visita a la tienda">
+            {galleryItems.map((photo, index) => (
+              <button className={`user-photo ${index === 0 ? "user-photo-large" : ""}`} key={photo.number} onClick={() => setSelectedPhoto(index)} aria-label={`Abrir fotografía ${photo.number}: ${photo.title}`}>
+                <img src={photo.src} alt={photo.alt} />
+                <span className="photo-expand"><ExternalLink size={15} /></span>
+                <span className="photo-caption"><b>{photo.number}</b>{photo.title} · Archivo del estudiante</span>
+              </button>
+            ))}
           </div>
+          <p className="gallery-help">Selecciona una fotografía para abrir el álbum. Usa los controles para recorrerlo.</p>
         </section>
 
         <section className="process-section section-pad" id="proceso">
@@ -249,8 +280,10 @@ export default function Home() {
               <input id="name" name="name" placeholder="Escribe cómo quieres aparecer" required />
               <label htmlFor="opinion">Tu perspectiva</label>
               <textarea id="opinion" name="opinion" rows={5} placeholder="Cuéntanos qué buscas en un par de tenis…" required />
-              <button className="button button-dark" type="submit">Enviar participación <ArrowUpRight size={16} /></button>
-              {submitted && <p className="form-success"><Check size={17} /> Gracias. Tu participación fue registrada en esta experiencia demo.</p>}
+              <input type="hidden" name="_subject" value="Nueva participación en Vans Brand Journalism" />
+              <button className="button button-dark" type="submit" disabled={sending}>{sending ? "Enviando…" : "Enviar participación"} <ArrowUpRight size={16} /></button>
+              {submitted && <p className="form-success"><Check size={17} /> Gracias. Tu participación fue enviada correctamente.</p>}
+              {formError && <p className="form-error" role="alert">{formError}</p>}
             </form>
           </div>
         </section>
@@ -281,6 +314,16 @@ export default function Home() {
             <p>Vans. (s. f.). <em>About: Off the Wall since 1966</em>. https://www.vans.com/en-us/about<br />Smithsonian Institution. (2021). <em>The invention of the iconic Vans skateboarding shoe</em>. https://invention.si.edu/<br />VF Corporation. (2025). <em>Fiscal year 2025 annual report</em>. https://www.vfc.com/</p>
           </div>
         </section>
+        {selectedPhoto !== null && (
+          <div className="lightbox" role="dialog" aria-modal="true" aria-label="Álbum fotográfico" onClick={() => setSelectedPhoto(null)}>
+            <div className="lightbox-panel" onClick={(event) => event.stopPropagation()}>
+              <button className="lightbox-close" onClick={() => setSelectedPhoto(null)} aria-label="Cerrar álbum"><X size={24} /></button>
+              <img src={galleryItems[selectedPhoto].src} alt={galleryItems[selectedPhoto].alt} />
+              <div className="lightbox-info"><span>{galleryItems[selectedPhoto].number} / {galleryItems.length}</span><h3>{galleryItems[selectedPhoto].title}</h3><p>{galleryItems[selectedPhoto].description}</p></div>
+              <div className="lightbox-controls"><button onClick={() => setSelectedPhoto((selectedPhoto - 1 + galleryItems.length) % galleryItems.length)} aria-label="Fotografía anterior"><ArrowUp size={18} className="rotate-left" /> Anterior</button><button onClick={() => setSelectedPhoto((selectedPhoto + 1) % galleryItems.length)} aria-label="Fotografía siguiente">Siguiente <ArrowUp size={18} className="rotate-right" /></button></div>
+            </div>
+          </div>
+        )}
       </main>
 
       <footer className="site-footer">
